@@ -273,7 +273,7 @@ class GptOssModel(nn.Module, ModelProtocol):
     GPT-OSS Transformer model with attention and feed-forward layers.
     """
 
-    def __init__(self, model_args: GptOssModelArgs):
+    def __init__(self, model_args: GptOssModelArgs, *, skip_init: bool = False):
         super().__init__()
         self.model_args = model_args
         self.max_seq_len = model_args.max_seq_len
@@ -296,7 +296,8 @@ class GptOssModel(nn.Module, ModelProtocol):
             bias=False,
         )
         self.model_args = model_args
-        self.init_weights()
+        if not skip_init:
+            self.init_weights()
 
     def init_weights(self, buffer_device: torch.device | None = None) -> None:
         buffer_device = buffer_device or self.rope_cache.device
@@ -339,6 +340,15 @@ class GptOssModel(nn.Module, ModelProtocol):
         sliding_window_mask_mods = [
             get_sliding_window_mask_mod(self.model_args.sliding_window_size)
         ]
+        eos_id = getattr(tokenizer, "eos_id", None)
+        if eos_id is None:
+            eos_id = getattr(tokenizer, "eos_token_id", None)
+        if eos_id is None and hasattr(tokenizer, "eos_token"):
+            eos_token = tokenizer.eos_token
+            if eos_token is not None and hasattr(tokenizer, "convert_tokens_to_ids"):
+                eos_id = tokenizer.convert_tokens_to_ids(eos_token)
+        if eos_id is None:
+            raise AttributeError("Tokenizer must define eos_id or eos_token_id for block_causal masks.")
         match self.model_args.attn_mask_type:
             case "causal":
                 B = 1
@@ -346,7 +356,7 @@ class GptOssModel(nn.Module, ModelProtocol):
             case "block_causal":
                 B = input_batch.shape[0]
                 basic_mask_mods.append(
-                    get_document_mask_mod(input_batch, tokenizer.eos_id)
+                    get_document_mask_mod(input_batch, eos_id)
                 )
             case _:
                 raise ValueError(

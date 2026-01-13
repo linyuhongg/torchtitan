@@ -116,13 +116,22 @@ class ParallelDims:
             Uses fake backend for dimensions with degree 1 or for 'batch' dimension
             to avoid unnecessary process group creation.
             """
-            backend_override = {}
+            backend_override: dict[str, str] = {}
             for name, degree in zip(dim_names, dim_degrees, strict=True):
                 if (not self._mesh_exist(name, degree)) or name == "batch":
                     backend_override[name] = "fake"
 
-            return world_mesh._unflatten(
-                0, dim_degrees, dim_names, backend_override=backend_override
+            if hasattr(world_mesh, "_unflatten"):
+                return world_mesh._unflatten(
+                    0, dim_degrees, dim_names, backend_override=backend_override
+                )
+
+            # Torch 2.9+ removed DeviceMesh._unflatten; build the mesh directly.
+            return init_device_mesh(
+                device_type,
+                dim_degrees,
+                mesh_dim_names=dim_names,
+                backend_override=backend_override or None,
             )
 
         logger.info(
@@ -162,6 +171,9 @@ class ParallelDims:
             "sparse": sparse_mesh,
         }
 
+        fsdp_enabled = self.dp_shard_enabled or self.cp_enabled
+        tp_mesh = dense_mesh["tp"] if fsdp_enabled else dataloading_mesh["tp"]
+
         self._meshes = {
             "pp": dataloading_mesh["pp"],
             "batch": dataloading_mesh["batch"],
@@ -169,7 +181,7 @@ class ParallelDims:
             "dp_replicate": dense_mesh["dp_replicate"],
             "fsdp": dense_mesh["fsdp"],
             "cp": dataloading_mesh["cp"],
-            "tp": dataloading_mesh["tp"],
+            "tp": tp_mesh,
             "ep": sparse_mesh["ep"],
             "efsdp": sparse_mesh["efsdp"],
             "etp": sparse_mesh["etp"],

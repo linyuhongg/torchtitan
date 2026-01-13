@@ -19,7 +19,7 @@ from torch.nn.attention.flex_attention import (
     flex_attention,
 )
 
-from torch.nn.attention.varlen import varlen_attn
+from .varlen import varlen_attn
 from torch.types import Number
 
 
@@ -105,7 +105,7 @@ class FlexAttentionWrapper(torch.nn.Module):
         flex_attention,
         # This options also encapsulate max-autotune-no-cudagraphs.
         options={
-            "wrap_inductor_compiled_regions": True,
+            # "wrap_inductor_compiled_regions": True,
             "max_autotune": True,
             "coordinate_descent_tuning": True,
             "triton.cudagraphs": False,

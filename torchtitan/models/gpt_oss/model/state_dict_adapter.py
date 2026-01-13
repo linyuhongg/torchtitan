@@ -32,8 +32,10 @@ class GptOssStateDictAdapter(MoEStateDictAdapter):
             "model.layers.{}.input_layernorm.weight": "layers.{}.attention_norm.weight",
             "model.layers.{}.post_attention_layernorm.weight": "layers.{}.ffn_norm.weight",
             # MoE
+            "model.layers.{}.mlp.experts.gate_up_proj": "layers.{}.moe.experts.mlp1_weight",
             "model.layers.{}.mlp.experts.gate_up_proj_blocks": "layers.{}.moe.experts.mlp1_weight",
             "model.layers.{}.mlp.experts.gate_up_proj_bias": "layers.{}.moe.experts.mlp1_bias",
+            "model.layers.{}.mlp.experts.down_proj": "layers.{}.moe.experts.mlp2_weight",
             "model.layers.{}.mlp.experts.down_proj_blocks": "layers.{}.moe.experts.mlp2_weight",
             "model.layers.{}.mlp.experts.down_proj_bias": "layers.{}.moe.experts.mlp2_bias",
             "model.layers.{}.mlp.router.weight": "layers.{}.moe.router.gate.weight",
@@ -109,6 +111,8 @@ class GptOssStateDictAdapter(MoEStateDictAdapter):
                 abstract_key = re.sub(r"(\d+)", "{}", key, count=1)
                 tt_key = self.from_hf_map[abstract_key]
                 tt_key = tt_key.format(layer_num)
+                if abstract_key == "model.layers.{}.mlp.experts.gate_up_proj" and value.ndim == 3:
+                    value = value.transpose(1, 2)
                 state_dict[tt_key] = value
             else:
                 tt_key = self.from_hf_map[key]

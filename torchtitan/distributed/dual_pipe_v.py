@@ -12,10 +12,13 @@ from torch import Tensor
 
 from torch.distributed.pipelining.schedules import (
     _Action,
-    _PipelineContext,
+    # _PipelineContext,
+    _PipelineSchedule,
     _PipelineScheduleRuntime,
     _wait_batch_p2p,
 )
+from dataclasses import dataclass
+from typing import Protocol
 from torch.distributed.pipelining.stage import _PipelineStageBase
 from torch.distributed.tensor import DeviceMesh, distribute_module
 from torch.profiler import record_function
@@ -27,6 +30,21 @@ from torchtitan.tools.utils import get_device_info
 """
 Below are optimizations related to pipeline parallelism with expert parallelism
 """
+
+
+@dataclass
+class _PipelineContext:
+    """Context passed to custom functions during pipeline execution."""
+
+    schedule_ref: _PipelineSchedule
+    arg_mbs: list[tuple] | None = None
+    kwarg_mbs: list[dict] | None = None
+    target_mbs: list | None = None
+    losses: list | None = None
+
+
+class _CustomFunctionProtocol(Protocol):
+    def __call__(self, action: _Action, ctx: _PipelineContext) -> None: ...
 
 
 def get_dual_pipe_v_flag(job_config, parallel_dims) -> bool:
